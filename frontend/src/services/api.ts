@@ -125,18 +125,11 @@ export const conversationsApi = {
 
   async sendMessage(
     conversationId: string,
-    message: {
-      ciphertext: string;
-      nonce: string;
-      signature: string;
-      encrypted_key_sender: string;
-      encrypted_key_recipient: string;
-      cipher_type?: string;
-    }
+    content: string
   ): Promise<Message> {
     return request<Message>(`/conversations/${conversationId}/messages`, {
       method: 'POST',
-      body: JSON.stringify(message),
+      body: JSON.stringify({ content }),
     });
   },
 };

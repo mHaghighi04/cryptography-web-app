@@ -1,15 +1,14 @@
 import { create } from 'zustand';
-import type { Conversation, Message, DecryptedMessage, User } from '../types';
-import { conversationsApi, usersApi } from '../services/api';
+import type { Conversation, Message } from '../types';
+import { conversationsApi } from '../services/api';
 import { socketService } from '../services/socket';
-import { encryptMessage, decryptMessage } from '../services/crypto';
 import { useAuth } from './useAuth';
 
 interface ChatState {
   conversations: Conversation[];
   currentConversation: Conversation | null;
-  messages: DecryptedMessage[];
-  typingUsers: Map<string, string>; // conversation_id -> username
+  messages: Message[];
+  typingUsers: Map<string, string>; // user_id -> username
   onlineUsers: Set<string>;
   isLoading: boolean;
   error: string | null;
@@ -18,7 +17,7 @@ interface ChatState {
   loadConversations: () => Promise<void>;
   selectConversation: (conversation: Conversation) => Promise<void>;
   startConversation: (userId: string) => Promise<void>;
-  sendMessage: (plaintext: string) => Promise<void>;
+  sendMessage: (content: string) => Promise<void>;
   clearError: () => void;
 }
 
@@ -58,28 +57,10 @@ export const useChat = create<ChatState>((set, get) => ({
       // Join new conversation room
       await socketService.joinConversation(conversation.id);
 
-      // Load messages
+      // Load messages (already decrypted by server)
       const fullConversation = await conversationsApi.get(conversation.id);
 
-      // Decrypt messages
-      const auth = useAuth.getState();
-      const decryptedMessages: DecryptedMessage[] = [];
-
-      for (const msg of fullConversation.messages) {
-        try {
-          const decrypted = await decryptMessageForUser(msg, auth);
-          decryptedMessages.push(decrypted);
-        } catch (error) {
-          console.error('Failed to decrypt message:', error);
-          decryptedMessages.push({
-            ...msg,
-            plaintext: '[Failed to decrypt]',
-            verified: false,
-          });
-        }
-      }
-
-      set({ messages: decryptedMessages, isLoading: false });
+      set({ messages: fullConversation.messages, isLoading: false });
     } catch (error) {
       set({
         isLoading: false,
@@ -109,42 +90,21 @@ export const useChat = create<ChatState>((set, get) => ({
     }
   },
 
-  sendMessage: async (plaintext: string) => {
+  sendMessage: async (content: string) => {
     const { currentConversation } = get();
     if (!currentConversation) return;
 
     const auth = useAuth.getState();
-    if (!auth.user || !auth.privateKeyPem) {
+    if (!auth.user) {
       set({ error: 'Not authenticated' });
       return;
     }
 
     try {
-      // Get recipient's public key
-      const otherParticipantId =
-        currentConversation.participant1_id === auth.user.id
-          ? currentConversation.participant2_id
-          : currentConversation.participant1_id;
-
-      const recipientKeyData = await usersApi.getPublicKey(otherParticipantId);
-
-      // Encrypt message
-      const encrypted = await encryptMessage(
-        plaintext,
-        auth.privateKeyPem,
-        auth.user.public_key,
-        recipientKeyData.public_key
-      );
-
-      // Send via Socket.IO
+      // Send plaintext via Socket.IO - server will encrypt
       const result = await socketService.sendMessage({
         conversation_id: currentConversation.id,
-        ciphertext: encrypted.ciphertext,
-        nonce: encrypted.nonce,
-        signature: encrypted.signature,
-        encrypted_key_sender: encrypted.encryptedKeySender,
-        encrypted_key_recipient: encrypted.encryptedKeyRecipient,
-        cipher_type: 'aes-256-gcm',
+        content,
       });
 
       if (result.error) {
@@ -160,62 +120,17 @@ export const useChat = create<ChatState>((set, get) => ({
   clearError: () => set({ error: null }),
 }));
 
-// Helper function to decrypt a message
-async function decryptMessageForUser(
-  msg: Message,
-  auth: { user: User | null; privateKey: CryptoKey | null }
-): Promise<DecryptedMessage> {
-  if (!auth.user || !auth.privateKey) {
-    throw new Error('Not authenticated');
-  }
-
-  // Determine which encrypted key to use
-  const isSender = msg.sender_id === auth.user.id;
-  const encryptedKey = isSender ? msg.encrypted_key_sender : msg.encrypted_key_recipient;
-
-  // Get sender's public key for signature verification
-  let senderPublicKey: string;
-  if (isSender) {
-    senderPublicKey = auth.user.public_key;
-  } else {
-    const senderData = await usersApi.getPublicKey(msg.sender_id);
-    senderPublicKey = senderData.public_key;
-  }
-
-  const { plaintext, verified } = await decryptMessage(
-    msg.ciphertext,
-    msg.nonce,
-    msg.signature,
-    encryptedKey,
-    auth.privateKey,
-    senderPublicKey
-  );
-
-  return {
-    ...msg,
-    plaintext,
-    verified,
-  };
-}
-
 // Initialize socket event handlers
 export function initializeChatSocket() {
-  // Handle new messages
-  socketService.onMessage(async (message) => {
+  // Handle new messages (already decrypted by server)
+  socketService.onMessage((message) => {
     const { currentConversation, messages } = useChat.getState();
-    const auth = useAuth.getState();
 
     // Only process if in the same conversation
     if (currentConversation?.id === message.conversation_id) {
-      try {
-        const decrypted = await decryptMessageForUser(message, auth);
-
-        // Check if message already exists (avoid duplicates)
-        if (!messages.find((m) => m.id === message.id)) {
-          useChat.setState({ messages: [...messages, decrypted] });
-        }
-      } catch (error) {
-        console.error('Failed to decrypt new message:', error);
+      // Check if message already exists (avoid duplicates)
+      if (!messages.find((m) => m.id === message.id)) {
+        useChat.setState({ messages: [...messages, message] });
       }
     }
 

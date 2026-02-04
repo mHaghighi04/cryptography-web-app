@@ -15,6 +15,7 @@ from ..schemas import (
     UserResponse,
 )
 from ..utils.security import get_current_user
+from ..utils.crypto import encrypt_message, decrypt_message
 
 router = APIRouter()
 
@@ -121,7 +122,7 @@ async def get_conversation(
     current_user: User = Depends(get_current_user),
     db: AsyncSession = Depends(get_db),
 ):
-    """Get conversation with messages."""
+    """Get conversation with messages (decrypted)."""
     result = await db.execute(
         select(Conversation)
         .options(
@@ -158,10 +159,32 @@ async def get_conversation(
     # Reverse to get chronological order
     messages = list(reversed(messages))
 
+    # Decrypt messages
+    decrypted_messages = []
+    for msg in messages:
+        try:
+            plaintext = decrypt_message(msg.content, msg.nonce)
+            decrypted_messages.append(MessageResponse(
+                id=msg.id,
+                conversation_id=msg.conversation_id,
+                sender_id=msg.sender_id,
+                content=plaintext,
+                created_at=msg.created_at,
+            ))
+        except Exception as e:
+            # If decryption fails, return a placeholder
+            decrypted_messages.append(MessageResponse(
+                id=msg.id,
+                conversation_id=msg.conversation_id,
+                sender_id=msg.sender_id,
+                content="[Message could not be decrypted]",
+                created_at=msg.created_at,
+            ))
+
     other = conversation.get_other_participant(current_user.id)
     conv_response = ConversationWithMessages.model_validate(conversation)
     conv_response.other_participant = UserResponse.model_validate(other)
-    conv_response.messages = [MessageResponse.model_validate(m) for m in messages]
+    conv_response.messages = decrypted_messages
 
     return conv_response
 
@@ -174,7 +197,7 @@ async def send_message(
     db: AsyncSession = Depends(get_db),
 ):
     """
-    Send an encrypted message.
+    Send a message (plaintext). Server encrypts before storing.
     This is a fallback for when WebSocket is not available.
     Prefer using Socket.IO for real-time messaging.
     """
@@ -196,16 +219,15 @@ async def send_message(
             detail="Not a participant in this conversation"
         )
 
+    # Encrypt message on server
+    ciphertext, nonce = encrypt_message(message_data.content)
+
     # Create message
     message = Message(
         conversation_id=conversation_id,
         sender_id=current_user.id,
-        ciphertext=message_data.ciphertext,
-        nonce=message_data.nonce,
-        signature=message_data.signature,
-        encrypted_key_sender=message_data.encrypted_key_sender,
-        encrypted_key_recipient=message_data.encrypted_key_recipient,
-        cipher_type=message_data.cipher_type,
+        content=ciphertext,
+        nonce=nonce,
     )
 
     db.add(message)
@@ -216,4 +238,10 @@ async def send_message(
     await db.commit()
     await db.refresh(message)
 
-    return MessageResponse.model_validate(message)
+    return MessageResponse(
+        id=message.id,
+        conversation_id=message.conversation_id,
+        sender_id=message.sender_id,
+        content=message_data.content,  # Return original plaintext
+        created_at=message.created_at,
+    )

@@ -115,12 +115,7 @@ class SocketService {
 
   async sendMessage(data: {
     conversation_id: string;
-    ciphertext: string;
-    nonce: string;
-    signature: string;
-    encrypted_key_sender: string;
-    encrypted_key_recipient: string;
-    cipher_type?: string;
+    content: string;
   }): Promise<{ success?: boolean; message_id?: string; error?: string }> {
     if (!this.socket?.connected) {
       return { error: 'Not connected' };

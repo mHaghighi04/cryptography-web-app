@@ -7,6 +7,7 @@ from sqlalchemy.orm import selectinload
 from ..database import AsyncSessionLocal
 from ..models import User, Conversation, Message
 from ..utils.security import get_user_from_token
+from ..utils.crypto import encrypt_message, decrypt_message
 from ..config import get_settings
 
 settings = get_settings()
@@ -161,19 +162,14 @@ async def leave_conversation(sid, data):
 @sio.event
 async def send_message(sid, data):
     """
-    Handle sending an encrypted message.
-    Message is already encrypted by the client.
+    Handle sending a message.
+    Client sends plaintext, server encrypts before storing.
     """
     conversation_id = data.get("conversation_id")
-    ciphertext = data.get("ciphertext")
-    nonce = data.get("nonce")
-    signature = data.get("signature")
-    encrypted_key_sender = data.get("encrypted_key_sender")
-    encrypted_key_recipient = data.get("encrypted_key_recipient")
-    cipher_type = data.get("cipher_type", "aes-256-gcm")
+    content = data.get("content")
 
-    if not all([conversation_id, ciphertext, nonce, signature, encrypted_key_sender, encrypted_key_recipient]):
-        return {"error": "Missing required fields"}
+    if not conversation_id or not content:
+        return {"error": "Missing required fields (conversation_id, content)"}
 
     user = await get_user_from_sid(sid)
     if not user:
@@ -194,16 +190,15 @@ async def send_message(sid, data):
         if conversation.participant1_id != user.id and conversation.participant2_id != user.id:
             return {"error": "Not a participant"}
 
+        # Encrypt message on server
+        ciphertext, nonce = encrypt_message(content)
+
         # Create message
         message = Message(
             conversation_id=conversation_id,
             sender_id=user.id,
-            ciphertext=ciphertext,
+            content=ciphertext,
             nonce=nonce,
-            signature=signature,
-            encrypted_key_sender=encrypted_key_sender,
-            encrypted_key_recipient=encrypted_key_recipient,
-            cipher_type=cipher_type,
         )
 
         db.add(message)
@@ -211,17 +206,12 @@ async def send_message(sid, data):
         await db.commit()
         await db.refresh(message)
 
-        # Prepare message data for broadcast
+        # Prepare message data for broadcast (plaintext for clients)
         message_data = {
             "id": message.id,
             "conversation_id": message.conversation_id,
             "sender_id": message.sender_id,
-            "ciphertext": message.ciphertext,
-            "nonce": message.nonce,
-            "signature": message.signature,
-            "encrypted_key_sender": message.encrypted_key_sender,
-            "encrypted_key_recipient": message.encrypted_key_recipient,
-            "cipher_type": message.cipher_type,
+            "content": content,  # Send plaintext to clients
             "created_at": message.created_at.isoformat(),
         }
 

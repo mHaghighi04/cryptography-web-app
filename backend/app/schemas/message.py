@@ -1,27 +1,18 @@
 from pydantic import BaseModel
 from datetime import datetime
-from typing import Optional
 
 
 class MessageCreate(BaseModel):
-    ciphertext: str
-    nonce: str
-    signature: str
-    encrypted_key_sender: str
-    encrypted_key_recipient: str
-    cipher_type: str = "aes-256-gcm"
+    """Message creation - client sends plaintext, server encrypts."""
+    content: str
 
 
 class MessageResponse(BaseModel):
+    """Message response - server decrypts and returns plaintext."""
     id: str
     conversation_id: str
     sender_id: str
-    ciphertext: str
-    nonce: str
-    signature: str
-    encrypted_key_sender: str
-    encrypted_key_recipient: str
-    cipher_type: str
+    content: str  # Decrypted plaintext
     created_at: datetime
 
     class Config:
@@ -29,11 +20,6 @@ class MessageResponse(BaseModel):
 
 
 class MessageSocket(BaseModel):
-    """Message format for Socket.IO events."""
+    """Message format for Socket.IO events - client sends plaintext."""
     conversation_id: str
-    ciphertext: str
-    nonce: str
-    signature: str
-    encrypted_key_sender: str
-    encrypted_key_recipient: str
-    cipher_type: str = "aes-256-gcm"
+    content: str

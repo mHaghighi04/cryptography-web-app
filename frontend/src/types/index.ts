@@ -20,18 +20,8 @@ export interface Message {
   id: string;
   conversation_id: string;
   sender_id: string;
-  ciphertext: string;
-  nonce: string;
-  signature: string;
-  encrypted_key_sender: string;
-  encrypted_key_recipient: string;
-  cipher_type: string;
+  content: string;  // Plaintext from server
   created_at: string;
-}
-
-export interface DecryptedMessage extends Message {
-  plaintext: string;
-  verified: boolean;
 }
 
 export interface LoginResponse {
@@ -47,7 +37,5 @@ export interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
-  privateKey: CryptoKey | null;
-  publicKey: CryptoKey | null;
   isAuthenticated: boolean;
 }
