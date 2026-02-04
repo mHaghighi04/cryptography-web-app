@@ -163,10 +163,13 @@ async def leave_conversation(sid, data):
 async def send_message(sid, data):
     """
     Handle sending a message.
-    Client sends plaintext, server encrypts before storing.
+    Client sends plaintext and optional signature, server encrypts before storing.
     """
     conversation_id = data.get("conversation_id")
     content = data.get("content")
+    signature = data.get("signature")  # Optional: RSA-PSS signature (base64)
+    encrypted_key_sender = data.get("encrypted_key_sender")  # Optional: RSA-OAEP wrapped key
+    encrypted_key_recipient = data.get("encrypted_key_recipient")  # Optional: RSA-OAEP wrapped key
 
     if not conversation_id or not content:
         return {"error": "Missing required fields (conversation_id, content)"}
@@ -193,12 +196,15 @@ async def send_message(sid, data):
         # Encrypt message on server
         ciphertext, nonce = encrypt_message(content)
 
-        # Create message
+        # Create message with optional signature fields
         message = Message(
             conversation_id=conversation_id,
             sender_id=user.id,
             ciphertext=ciphertext,
             nonce=nonce,
+            signature=signature,
+            encrypted_key_sender=encrypted_key_sender,
+            encrypted_key_recipient=encrypted_key_recipient,
         )
 
         db.add(message)
@@ -206,7 +212,7 @@ async def send_message(sid, data):
         await db.commit()
         await db.refresh(message)
 
-        print(f"Message saved: id={message.id}, conversation={conversation_id}, content_length={len(content)}")
+        print(f"Message saved: id={message.id}, conversation={conversation_id}, content_length={len(content)}, has_signature={signature is not None}")
 
         # Prepare message data for broadcast (plaintext for clients)
         message_data = {
@@ -215,6 +221,9 @@ async def send_message(sid, data):
             "sender_id": message.sender_id,
             "content": content,  # Send plaintext to clients
             "created_at": message.created_at.isoformat(),
+            "signature": signature,  # Include signature for verification
+            "encrypted_key_sender": encrypted_key_sender,
+            "encrypted_key_recipient": encrypted_key_recipient,
         }
 
         # Broadcast to conversation room (including sender for confirmation)

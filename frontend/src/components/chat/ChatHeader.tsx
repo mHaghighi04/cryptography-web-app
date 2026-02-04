@@ -1,5 +1,6 @@
 import { useChat } from '../../hooks/useChat';
 import { useAuth } from '../../hooks/useAuth';
+import { CertificateStatus, ConversationCertificateBadge } from '../CertificateStatus';
 
 export function ChatHeader() {
   const { currentConversation, onlineUsers } = useChat();
@@ -22,13 +23,24 @@ export function ChatHeader() {
               )}
             </div>
             <div className="ml-3">
-              <div className="font-medium text-gray-800">{participant.username}</div>
-              <div className="text-sm text-gray-500">
+              <div className="flex items-center gap-2">
+                <span className="font-medium text-gray-800">{participant.username}</span>
+                <CertificateStatus
+                  status={participant.certificate_status}
+                  showLabel={false}
+                  size="sm"
+                />
+              </div>
+              <div className="flex items-center gap-2 text-sm text-gray-500">
                 {isOnline ? (
                   <span className="text-green-500">Online</span>
                 ) : (
                   'Offline'
                 )}
+                <ConversationCertificateBadge
+                  myStatus={user?.certificate_status}
+                  theirStatus={participant.certificate_status}
+                />
               </div>
             </div>
           </>
@@ -39,8 +51,15 @@ export function ChatHeader() {
 
       <div className="flex items-center gap-4">
         {user && (
-          <div className="text-sm text-gray-600">
-            Logged in as <span className="font-medium">{user.username}</span>
+          <div className="flex items-center gap-2 text-sm text-gray-600">
+            <span>
+              Logged in as <span className="font-medium">{user.username}</span>
+            </span>
+            <CertificateStatus
+              status={user.certificate_status}
+              showLabel={true}
+              size="sm"
+            />
           </div>
         )}
         <button

@@ -7,8 +7,10 @@ import {
   deriveKey,
   generateKeyPair,
   encryptPrivateKey,
+  generateCSR,
 } from '../services/crypto';
 import { socketService } from '../services/socket';
+import { initializeKeyStore, clearKeyStore } from '../services/keyStore';
 
 interface AuthState {
   user: User | null;
@@ -49,18 +51,30 @@ export const useAuth = create<AuthState>()(
           // Encrypt private key with password (stored but not used for message encryption)
           const encryptedPrivateKey = await encryptPrivateKey(privateKeyPem, password, salt);
 
-          // Register user
+          // Generate Certificate Signing Request (CSR)
+          const csr = generateCSR(privateKeyPem, publicKeyPem, username);
+
+          // Register user with CSR
           const response = await authApi.signup({
             username,
             salt,
             password_hash: passwordHash,
             encrypted_private_key: encryptedPrivateKey,
             public_key: publicKeyPem,
+            csr,
           });
 
           // Store tokens in localStorage for API requests
           localStorage.setItem('accessToken', response.access_token);
           localStorage.setItem('refreshToken', response.refresh_token);
+
+          // Initialize key store with the keys we just generated
+          await initializeKeyStore(
+            encryptedPrivateKey,
+            password,
+            salt,
+            publicKeyPem
+          );
 
           // Connect socket
           await socketService.connect(response.access_token);
@@ -102,6 +116,14 @@ export const useAuth = create<AuthState>()(
           localStorage.setItem('accessToken', response.access_token);
           localStorage.setItem('refreshToken', response.refresh_token);
 
+          // Initialize key store for message signing
+          await initializeKeyStore(
+            response.encrypted_private_key,
+            password,
+            initResponse.salt,
+            response.user.public_key
+          );
+
           // Connect socket
           await socketService.connect(response.access_token);
 
@@ -122,6 +144,8 @@ export const useAuth = create<AuthState>()(
       },
 
       logout: () => {
+        // Clear the key store
+        clearKeyStore();
         socketService.disconnect();
         localStorage.removeItem('accessToken');
         localStorage.removeItem('refreshToken');

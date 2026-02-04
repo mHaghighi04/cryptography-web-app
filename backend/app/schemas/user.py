@@ -9,6 +9,7 @@ class UserCreate(BaseModel):
     password_hash: str = Field(..., min_length=64)
     encrypted_private_key: str
     public_key: str
+    csr: str  # PEM-encoded Certificate Signing Request
 
 
 class UserResponse(BaseModel):
@@ -18,6 +19,8 @@ class UserResponse(BaseModel):
     is_online: bool
     created_at: datetime
     last_seen: datetime
+    certificate_status: Optional[str] = "none"
+    certificate: Optional[str] = None
 
     class Config:
         from_attributes = True
@@ -53,6 +56,8 @@ class LoginResponse(BaseModel):
     user: UserResponse
     encrypted_private_key: str
     requires_key_migration: bool = False
+    certificate_status: str = "none"
+    certificate: Optional[str] = None
 
 
 class TokenRefresh(BaseModel):

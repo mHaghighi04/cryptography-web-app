@@ -15,6 +15,11 @@ class Message(Base):
     nonce = Column(String(48), nullable=False)  # For decryption
     created_at = Column(DateTime, default=datetime.utcnow)
 
+    # Digital signature fields
+    signature = Column(Text, nullable=True)  # RSA-PSS signature (base64)
+    encrypted_key_sender = Column(Text, nullable=True)  # RSA-OAEP wrapped key for sender
+    encrypted_key_recipient = Column(Text, nullable=True)  # RSA-OAEP wrapped key for recipient
+
     # Relationships
     conversation = relationship("Conversation", back_populates="messages")
     sender = relationship("User", back_populates="sent_messages", foreign_keys=[sender_id])

@@ -25,3 +25,17 @@ export {
   decryptMessageAsSender,
   decryptMessageAsRecipient,
 } from './encryption';
+
+export {
+  generateCSR,
+  getPublicKeyFromCertificate,
+  getCertificateInfo,
+  verifyCertificate,
+  isCertificateExpired,
+} from './csr';
+
+export {
+  signMessage,
+  verifyMessageSignature,
+  verifyMessageSignatureWithCert,
+} from './signing';

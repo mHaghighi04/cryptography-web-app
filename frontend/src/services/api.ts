@@ -1,4 +1,11 @@
-import type { User, Conversation, Message, LoginResponse } from '../types';
+import type {
+  User,
+  Conversation,
+  Message,
+  LoginResponse,
+  CertificateStatusResponse,
+  UserCertificateResponse,
+} from '../types';
 
 // Use environment variable or default to relative path for local dev
 const BACKEND_URL = import.meta.env.VITE_BACKEND_URL || '';
@@ -91,6 +98,7 @@ export const authApi = {
     password_hash: string;
     encrypted_private_key: string;
     public_key: string;
+    csr: string;
   }): Promise<LoginResponse> {
     return request<LoginResponse>('/auth/signup', {
       method: 'POST',
@@ -175,6 +183,49 @@ export const conversationsApi = {
       method: 'POST',
       body: JSON.stringify({ content }),
     });
+  },
+};
+
+// Certificates API
+export const certificatesApi = {
+  /**
+   * Get the CA certificate (public).
+   * Used for verifying other users' certificates.
+   */
+  async getCACertificate(): Promise<{ certificate: string }> {
+    return request<{ certificate: string }>('/certificates/ca');
+  },
+
+  /**
+   * Get current user's CSR.
+   */
+  async getMyCsr(): Promise<{ csr: string; username: string }> {
+    return request<{ csr: string; username: string }>('/certificates/my-csr');
+  },
+
+  /**
+   * Upload a signed certificate for the current user.
+   */
+  async uploadCertificate(certificate: string): Promise<CertificateStatusResponse> {
+    return request<CertificateStatusResponse>('/certificates/upload', {
+      method: 'POST',
+      body: JSON.stringify({ certificate }),
+    });
+  },
+
+  /**
+   * Get current user's certificate status.
+   */
+  async getStatus(): Promise<CertificateStatusResponse> {
+    return request<CertificateStatusResponse>('/certificates/status');
+  },
+
+  /**
+   * Get another user's certificate.
+   * Used for encrypting messages to recipient and verifying signatures.
+   */
+  async getUserCertificate(userId: string): Promise<UserCertificateResponse> {
+    return request<UserCertificateResponse>(`/certificates/user/${userId}`);
   },
 };
 

@@ -34,13 +34,15 @@ async def signup(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
             detail="Username already registered"
         )
 
-    # Create user
+    # Create user with CSR
     user = User(
         username=user_data.username,
         salt=user_data.salt,
         password_hash=user_data.password_hash,
         encrypted_private_key=user_data.encrypted_private_key,
         public_key=user_data.public_key,
+        csr=user_data.csr,
+        certificate_status="pending",
     )
 
     db.add(user)
@@ -56,6 +58,8 @@ async def signup(user_data: UserCreate, db: AsyncSession = Depends(get_db)):
         refresh_token=refresh_token,
         user=UserResponse.model_validate(user),
         encrypted_private_key=user.encrypted_private_key,
+        certificate_status=user.certificate_status or "pending",
+        certificate=user.certificate,
     )
 
 
@@ -106,6 +110,8 @@ async def login(data: LoginRequest, db: AsyncSession = Depends(get_db)):
         user=UserResponse.model_validate(user),
         encrypted_private_key=user.encrypted_private_key,
         requires_key_migration=user.requires_key_migration,
+        certificate_status=user.certificate_status or "none",
+        certificate=user.certificate,
     )
 
 

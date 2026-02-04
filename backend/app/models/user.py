@@ -19,6 +19,13 @@ class User(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
     last_seen = Column(DateTime, default=datetime.utcnow)
 
+    # Certificate Authority fields
+    csr = Column(Text, nullable=True)  # PEM-encoded CSR
+    certificate = Column(Text, nullable=True)  # PEM-encoded signed certificate
+    certificate_status = Column(String(20), default="none")  # none/pending/active/expired/revoked
+    certificate_expires_at = Column(DateTime, nullable=True)
+    certificate_serial = Column(String(50), nullable=True)
+
     # Relationships
     sent_messages = relationship(
         "Message",

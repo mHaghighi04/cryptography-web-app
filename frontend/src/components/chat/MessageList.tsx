@@ -94,12 +94,42 @@ function MessageBubble({ message, isMine }: MessageBubbleProps) {
     minute: '2-digit',
   });
 
+  // Signature verification status indicator
+  const getSignatureIcon = () => {
+    if (!message.signature) {
+      // No signature - show nothing or a neutral indicator
+      return null;
+    }
+    if (message.signature_verified === true) {
+      return (
+        <span
+          className={`text-xs ${isMine ? 'text-green-200' : 'text-green-500'}`}
+          title="Signature verified"
+        >
+          ✓
+        </span>
+      );
+    }
+    if (message.signature_verified === false) {
+      return (
+        <span
+          className="text-xs text-red-500"
+          title={message.signature_verification_error || 'Signature invalid'}
+        >
+          ⚠
+        </span>
+      );
+    }
+    // Verification in progress or unknown
+    return null;
+  };
+
   return (
     <div className={`flex ${isMine ? 'justify-end' : 'justify-start'}`}>
       <div
         className={`max-w-[70%] rounded-lg px-4 py-2 ${
           isMine ? 'bg-blue-500 text-white' : 'bg-white text-gray-800 shadow'
-        }`}
+        } ${message.signature_verified === false ? 'ring-2 ring-red-300' : ''}`}
       >
         <div className="break-words">{message.content}</div>
         <div
@@ -107,6 +137,7 @@ function MessageBubble({ message, isMine }: MessageBubbleProps) {
             isMine ? 'text-blue-100' : 'text-gray-400'
           }`}
         >
+          {getSignatureIcon()}
           <span>{time}</span>
         </div>
       </div>
