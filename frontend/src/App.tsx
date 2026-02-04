@@ -3,6 +3,9 @@ import { LoginForm, SignupForm } from './components/auth';
 import { ChatWindow } from './components/chat';
 import { useAuth, initializeAuth } from './hooks/useAuth';
 
+// Keep-alive interval: ping backend every 5 minutes to prevent Render free tier spin-down
+const KEEP_ALIVE_INTERVAL = 5 * 60 * 1000; // 5 minutes in ms
+
 function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
   const [isInitializing, setIsInitializing] = useState(true);
@@ -14,6 +17,26 @@ function App() {
       setIsInitializing(false);
     };
     init();
+  }, []);
+
+  // Keep-alive heartbeat to prevent backend from spinning down
+  useEffect(() => {
+    const pingBackend = async () => {
+      try {
+        const backendUrl = import.meta.env.VITE_BACKEND_URL || '';
+        await fetch(`${backendUrl}/health`);
+      } catch {
+        // Ignore errors - just trying to keep server warm
+      }
+    };
+
+    // Initial ping
+    pingBackend();
+
+    // Set up interval
+    const interval = setInterval(pingBackend, KEEP_ALIVE_INTERVAL);
+
+    return () => clearInterval(interval);
   }, []);
 
   // Show loading while initializing auth or during auth operations
