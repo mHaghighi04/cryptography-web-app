@@ -103,3 +103,8 @@ async def root():
 @app.get("/health")
 async def health():
     return {"status": "healthy"}
+
+
+@app.get("/version")
+async def version():
+    return {"version": "1.1.0", "features": ["certificates", "signatures", "migrations"]}
