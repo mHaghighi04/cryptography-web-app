@@ -16,30 +16,35 @@ interface AuthState {
   user: User | null;
   accessToken: string | null;
   refreshToken: string | null;
+  encryptedPrivateKey: string | null;
   privateKey: CryptoKey | null;
   privateKeyPem: string | null;
   salt: string | null;
   isAuthenticated: boolean;
+  needsUnlock: boolean;
   isLoading: boolean;
   error: string | null;
 
   // Actions
   signup: (username: string, password: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
+  unlock: (password: string) => Promise<void>;
   logout: () => void;
   clearError: () => void;
 }
 
 export const useAuth = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       accessToken: null,
       refreshToken: null,
+      encryptedPrivateKey: null,
       privateKey: null,
       privateKeyPem: null,
       salt: null,
       isAuthenticated: false,
+      needsUnlock: false,
       isLoading: false,
       error: null,
 
@@ -66,10 +71,6 @@ export const useAuth = create<AuthState>()(
             public_key: publicKeyPem,
           });
 
-          // Store tokens
-          localStorage.setItem('accessToken', response.access_token);
-          localStorage.setItem('refreshToken', response.refresh_token);
-
           // Decrypt private key for use
           const privateKey = await decryptPrivateKey(encryptedPrivateKey, password, salt);
 
@@ -80,10 +81,12 @@ export const useAuth = create<AuthState>()(
             user: response.user,
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
+            encryptedPrivateKey,
             privateKey,
             privateKeyPem,
             salt,
             isAuthenticated: true,
+            needsUnlock: false,
             isLoading: false,
           });
         } catch (error) {
@@ -112,10 +115,6 @@ export const useAuth = create<AuthState>()(
           // Login
           const response = await authApi.login(username, passwordHash);
 
-          // Store tokens
-          localStorage.setItem('accessToken', response.access_token);
-          localStorage.setItem('refreshToken', response.refresh_token);
-
           // Decrypt private key
           const privateKey = await decryptPrivateKey(
             response.encrypted_private_key,
@@ -133,10 +132,12 @@ export const useAuth = create<AuthState>()(
             user: response.user,
             accessToken: response.access_token,
             refreshToken: response.refresh_token,
+            encryptedPrivateKey: response.encrypted_private_key,
             privateKey,
             privateKeyPem,
             salt: initResponse.salt,
             isAuthenticated: true,
+            needsUnlock: false,
             isLoading: false,
           });
         } catch (error) {
@@ -148,19 +149,54 @@ export const useAuth = create<AuthState>()(
         }
       },
 
+      unlock: async (password: string) => {
+        const { encryptedPrivateKey, salt, accessToken } = get();
+
+        if (!encryptedPrivateKey || !salt || !accessToken) {
+          set({ error: 'Session expired. Please login again.' });
+          get().logout();
+          return;
+        }
+
+        set({ isLoading: true, error: null });
+
+        try {
+          // Decrypt private key
+          const privateKey = await decryptPrivateKey(encryptedPrivateKey, password, salt);
+
+          // Export to PEM for encryption operations
+          const privateKeyPem = await exportPrivateKeyToPem(privateKey);
+
+          // Reconnect socket
+          await socketService.connect(accessToken);
+
+          set({
+            privateKey,
+            privateKeyPem,
+            needsUnlock: false,
+            isLoading: false,
+          });
+        } catch (error) {
+          set({
+            isLoading: false,
+            error: 'Invalid password',
+          });
+        }
+      },
+
       logout: () => {
-        localStorage.removeItem('accessToken');
-        localStorage.removeItem('refreshToken');
         socketService.disconnect();
 
         set({
           user: null,
           accessToken: null,
           refreshToken: null,
+          encryptedPrivateKey: null,
           privateKey: null,
           privateKeyPem: null,
           salt: null,
           isAuthenticated: false,
+          needsUnlock: false,
           isLoading: false,
           error: null,
         });
@@ -171,25 +207,40 @@ export const useAuth = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({
-        // Only persist non-sensitive data
-        // Private key and tokens are handled separately
         user: state.user,
+        accessToken: state.accessToken,
+        refreshToken: state.refreshToken,
+        encryptedPrivateKey: state.encryptedPrivateKey,
         salt: state.salt,
+        isAuthenticated: state.isAuthenticated,
       }),
+      onRehydrate: () => {
+        return (state) => {
+          // After rehydration, if user is authenticated but no private key, they need to unlock
+          if (state?.isAuthenticated && !state?.privateKey) {
+            state.needsUnlock = true;
+          }
+        };
+      },
     }
   )
 );
 
 // Re-authenticate on page load if tokens exist
 export async function initializeAuth(): Promise<void> {
-  const accessToken = localStorage.getItem('accessToken');
-  if (accessToken) {
-    try {
-      await socketService.connect(accessToken);
-    } catch (error) {
-      console.error('Failed to reconnect socket:', error);
-      // Token might be expired, let user re-login
-      useAuth.getState().logout();
+  const state = useAuth.getState();
+  if (state.accessToken && state.isAuthenticated) {
+    if (!state.privateKey) {
+      // User needs to unlock with password
+      useAuth.setState({ needsUnlock: true });
+    } else {
+      // Try to reconnect socket
+      try {
+        await socketService.connect(state.accessToken);
+      } catch (error) {
+        console.error('Failed to reconnect socket:', error);
+        useAuth.getState().logout();
+      }
     }
   }
 }

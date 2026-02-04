@@ -1,11 +1,11 @@
 import { useState, useEffect } from 'react';
-import { LoginForm, SignupForm } from './components/auth';
+import { LoginForm, SignupForm, UnlockForm } from './components/auth';
 import { ChatWindow } from './components/chat';
 import { useAuth, initializeAuth } from './hooks/useAuth';
 
 function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
-  const { isAuthenticated, isLoading } = useAuth();
+  const { isAuthenticated, needsUnlock, isLoading } = useAuth();
 
   useEffect(() => {
     initializeAuth();
@@ -19,10 +19,17 @@ function App() {
     );
   }
 
+  // User is authenticated but needs to unlock their private key
+  if (isAuthenticated && needsUnlock) {
+    return <UnlockForm />;
+  }
+
+  // User is fully authenticated
   if (isAuthenticated) {
     return <ChatWindow />;
   }
 
+  // User needs to login or signup
   if (authMode === 'login') {
     return <LoginForm onSwitchToSignup={() => setAuthMode('signup')} />;
   }
