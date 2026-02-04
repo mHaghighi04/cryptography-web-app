@@ -124,7 +124,7 @@ export const useChat = create<ChatState>((set, get) => ({
 export function initializeChatSocket() {
   // Handle new messages (already decrypted by server)
   socketService.onMessage((message) => {
-    const { currentConversation, messages } = useChat.getState();
+    const { currentConversation, messages, conversations } = useChat.getState();
 
     // Only process if in the same conversation
     if (currentConversation?.id === message.conversation_id) {
@@ -134,8 +134,15 @@ export function initializeChatSocket() {
       }
     }
 
-    // Reload conversations to update order
-    useChat.getState().loadConversations();
+    // Move the conversation to the top of the list (without API call)
+    const conversationIndex = conversations.findIndex(c => c.id === message.conversation_id);
+    if (conversationIndex > 0) {
+      const updatedConversations = [...conversations];
+      const [movedConversation] = updatedConversations.splice(conversationIndex, 1);
+      movedConversation.updated_at = new Date().toISOString();
+      updatedConversations.unshift(movedConversation);
+      useChat.setState({ conversations: updatedConversations });
+    }
   });
 
   // Handle typing indicators
