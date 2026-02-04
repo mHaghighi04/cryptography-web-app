@@ -156,6 +156,8 @@ async def get_conversation(
     )
     messages = result.scalars().all()
 
+    print(f"Fetched {len(messages)} messages for conversation {conversation_id}")
+
     # Reverse to get chronological order
     messages = list(reversed(messages))
 

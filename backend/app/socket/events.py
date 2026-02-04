@@ -206,6 +206,8 @@ async def send_message(sid, data):
         await db.commit()
         await db.refresh(message)
 
+        print(f"Message saved: id={message.id}, conversation={conversation_id}, content_length={len(content)}")
+
         # Prepare message data for broadcast (plaintext for clients)
         message_data = {
             "id": message.id,

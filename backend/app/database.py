@@ -4,6 +4,8 @@ from .config import get_settings
 
 settings = get_settings()
 
+print(f"Database URL: {settings.database_url}")
+
 engine = create_async_engine(
     settings.database_url,
     echo=settings.debug,
