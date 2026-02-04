@@ -7,9 +7,10 @@ import httpx
 import os
 
 from .config import get_settings
-from .database import init_db
+from .database import init_db, engine
 from .api import api_router
 from .socket import sio
+from .migrations import run_migrations
 
 settings = get_settings()
 
@@ -48,6 +49,9 @@ async def lifespan(app: FastAPI):
     # Startup
     await init_db()
     print("Database initialized")
+
+    # Run migrations to add any missing columns
+    await run_migrations(engine)
 
     # Start keep-alive background task
     keep_alive_task = asyncio.create_task(keep_alive())
