@@ -62,7 +62,7 @@ export async function encryptPrivateKey(
   const privateKeyBytes = encoder.encode(privateKeyPem);
 
   const ciphertext = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
     encryptionKey,
     privateKeyBytes
   );
@@ -92,9 +92,9 @@ export async function decryptPrivateKey(
 
   // Decrypt
   const privateKeyBytes = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv },
+    { name: 'AES-GCM', iv: iv.buffer as ArrayBuffer },
     encryptionKey,
-    ciphertext
+    ciphertext.buffer as ArrayBuffer
   );
 
   // Parse PEM and import key

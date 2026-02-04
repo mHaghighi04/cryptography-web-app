@@ -46,7 +46,7 @@ export async function encryptMessage(
   const plaintextBytes = encoder.encode(plaintext);
 
   const ciphertextBuffer = await crypto.subtle.encrypt(
-    { name: 'AES-GCM', iv: nonce },
+    { name: 'AES-GCM', iv: nonce.buffer as ArrayBuffer },
     symmetricKey,
     plaintextBytes
   );
@@ -61,7 +61,7 @@ export async function encryptMessage(
   const encryptedKeySenderBuffer = await crypto.subtle.encrypt(
     { name: 'RSA-OAEP' },
     senderPublicKey,
-    rawKeyBytes
+    rawKeyBytes.buffer as ArrayBuffer
   );
   const encryptedKeySender = arrayToBase64(new Uint8Array(encryptedKeySenderBuffer));
 
@@ -70,7 +70,7 @@ export async function encryptMessage(
   const encryptedKeyRecipientBuffer = await crypto.subtle.encrypt(
     { name: 'RSA-OAEP' },
     recipientPublicKey,
-    rawKeyBytes
+    rawKeyBytes.buffer as ArrayBuffer
   );
   const encryptedKeyRecipient = arrayToBase64(new Uint8Array(encryptedKeyRecipientBuffer));
 
@@ -83,7 +83,7 @@ export async function encryptMessage(
   const signatureBuffer = await crypto.subtle.sign(
     { name: 'RSA-PSS', saltLength: 32 },
     signingKey,
-    dataToSign
+    dataToSign.buffer as ArrayBuffer
   );
   const signature = arrayToBase64(new Uint8Array(signatureBuffer));
 
@@ -103,7 +103,7 @@ export async function decryptMessage(
   ciphertextHex: string,
   nonceHex: string,
   signature: string,
-  encryptedKey: string, // The appropriate key (sender or recipient)
+  encryptedKey: string,
   privateKey: CryptoKey,
   senderPublicKeyPem: string
 ): Promise<{ plaintext: string; verified: boolean }> {
