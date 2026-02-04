@@ -184,11 +184,17 @@ async def get_conversation(
             ))
 
     other = conversation.get_other_participant(current_user.id)
-    conv_response = ConversationWithMessages.model_validate(conversation)
-    conv_response.other_participant = UserResponse.model_validate(other)
-    conv_response.messages = decrypted_messages
 
-    return conv_response
+    # Build response manually to avoid SQLAlchemy lazy loading issues
+    return ConversationWithMessages(
+        id=conversation.id,
+        participant1_id=conversation.participant1_id,
+        participant2_id=conversation.participant2_id,
+        created_at=conversation.created_at,
+        updated_at=conversation.updated_at,
+        other_participant=UserResponse.model_validate(other),
+        messages=decrypted_messages,
+    )
 
 
 @router.post("/{conversation_id}/messages", response_model=MessageResponse)
