@@ -5,13 +5,19 @@ import { useAuth, initializeAuth } from './hooks/useAuth';
 
 function App() {
   const [authMode, setAuthMode] = useState<'login' | 'signup'>('login');
+  const [isInitializing, setIsInitializing] = useState(true);
   const { isAuthenticated, isLoading } = useAuth();
 
   useEffect(() => {
-    initializeAuth();
+    const init = async () => {
+      await initializeAuth();
+      setIsInitializing(false);
+    };
+    init();
   }, []);
 
-  if (isLoading) {
+  // Show loading while initializing auth or during auth operations
+  if (isInitializing || isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-100">
         <div className="text-gray-600">Loading...</div>
