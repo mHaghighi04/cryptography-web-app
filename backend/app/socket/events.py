@@ -197,7 +197,7 @@ async def send_message(sid, data):
         message = Message(
             conversation_id=conversation_id,
             sender_id=user.id,
-            content=ciphertext,
+            ciphertext=ciphertext,
             nonce=nonce,
         )
 

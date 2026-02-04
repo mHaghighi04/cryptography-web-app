@@ -58,8 +58,9 @@ export const useAuth = create<AuthState>()(
             public_key: publicKeyPem,
           });
 
-          // Store token in localStorage for API requests
+          // Store tokens in localStorage for API requests
           localStorage.setItem('accessToken', response.access_token);
+          localStorage.setItem('refreshToken', response.refresh_token);
 
           // Connect socket
           await socketService.connect(response.access_token);
@@ -97,8 +98,9 @@ export const useAuth = create<AuthState>()(
           // Login
           const response = await authApi.login(username, passwordHash);
 
-          // Store token in localStorage for API requests
+          // Store tokens in localStorage for API requests
           localStorage.setItem('accessToken', response.access_token);
+          localStorage.setItem('refreshToken', response.refresh_token);
 
           // Connect socket
           await socketService.connect(response.access_token);
@@ -122,6 +124,7 @@ export const useAuth = create<AuthState>()(
       logout: () => {
         socketService.disconnect();
         localStorage.removeItem('accessToken');
+        localStorage.removeItem('refreshToken');
 
         set({
           user: null,
@@ -151,15 +154,36 @@ export const useAuth = create<AuthState>()(
 export async function initializeAuth(): Promise<void> {
   const state = useAuth.getState();
   if (state.accessToken && state.isAuthenticated) {
-    // Restore token to localStorage
+    // Restore tokens to localStorage
     localStorage.setItem('accessToken', state.accessToken);
+    if (state.refreshToken) {
+      localStorage.setItem('refreshToken', state.refreshToken);
+    }
 
     // Try to reconnect socket
     try {
       await socketService.connect(state.accessToken);
     } catch (error) {
       console.error('Failed to reconnect socket:', error);
-      useAuth.getState().logout();
+      // Try to refresh the token
+      if (state.refreshToken) {
+        try {
+          const response = await authApi.refresh(state.refreshToken);
+          localStorage.setItem('accessToken', response.access_token);
+          localStorage.setItem('refreshToken', response.refresh_token);
+          useAuth.setState({
+            accessToken: response.access_token,
+            refreshToken: response.refresh_token,
+          });
+          // Try to connect with new token
+          await socketService.connect(response.access_token);
+        } catch (refreshError) {
+          console.error('Token refresh failed:', refreshError);
+          useAuth.getState().logout();
+        }
+      } else {
+        useAuth.getState().logout();
+      }
     }
   }
 }

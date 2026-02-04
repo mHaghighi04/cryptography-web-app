@@ -163,7 +163,7 @@ async def get_conversation(
     decrypted_messages = []
     for msg in messages:
         try:
-            plaintext = decrypt_message(msg.content, msg.nonce)
+            plaintext = decrypt_message(msg.ciphertext, msg.nonce)
             decrypted_messages.append(MessageResponse(
                 id=msg.id,
                 conversation_id=msg.conversation_id,
@@ -226,7 +226,7 @@ async def send_message(
     message = Message(
         conversation_id=conversation_id,
         sender_id=current_user.id,
-        content=ciphertext,
+        ciphertext=ciphertext,
         nonce=nonce,
     )
 

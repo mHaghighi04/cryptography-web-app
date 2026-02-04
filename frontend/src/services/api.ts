@@ -11,9 +11,36 @@ class ApiError extends Error {
   }
 }
 
+// Track if we're currently refreshing to avoid multiple refreshes
+let isRefreshing = false;
+let refreshPromise: Promise<string | null> | null = null;
+
+async function refreshAccessToken(): Promise<string | null> {
+  const refreshToken = localStorage.getItem('refreshToken');
+  if (!refreshToken) return null;
+
+  try {
+    const response = await fetch(`${API_BASE}/auth/refresh`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ refresh_token: refreshToken }),
+    });
+
+    if (!response.ok) return null;
+
+    const data = await response.json();
+    localStorage.setItem('accessToken', data.access_token);
+    localStorage.setItem('refreshToken', data.refresh_token);
+    return data.access_token;
+  } catch {
+    return null;
+  }
+}
+
 async function request<T>(
   endpoint: string,
-  options: RequestInit = {}
+  options: RequestInit = {},
+  retryOnAuth = true
 ): Promise<T> {
   const token = localStorage.getItem('accessToken');
 
@@ -30,6 +57,23 @@ async function request<T>(
     ...options,
     headers,
   });
+
+  // Handle 401 - try to refresh token
+  if (response.status === 401 && retryOnAuth) {
+    if (!isRefreshing) {
+      isRefreshing = true;
+      refreshPromise = refreshAccessToken();
+    }
+
+    const newToken = await refreshPromise;
+    isRefreshing = false;
+    refreshPromise = null;
+
+    if (newToken) {
+      // Retry the request with new token
+      return request<T>(endpoint, options, false);
+    }
+  }
 
   if (!response.ok) {
     const error = await response.json().catch(() => ({ detail: 'Unknown error' }));
@@ -72,7 +116,7 @@ export const authApi = {
     return request<{ access_token: string; refresh_token: string }>('/auth/refresh', {
       method: 'POST',
       body: JSON.stringify({ refresh_token }),
-    });
+    }, false);
   },
 };
 
