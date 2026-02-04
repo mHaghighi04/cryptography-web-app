@@ -130,7 +130,7 @@ export async function decryptMessage(
 
   // Decrypt message
   const plaintextBuffer = await crypto.subtle.decrypt(
-    { name: 'AES-GCM', iv: nonce },
+    { name: 'AES-GCM', iv: nonce.buffer as ArrayBuffer },
     symmetricKey,
     ciphertext.buffer as ArrayBuffer
   );
