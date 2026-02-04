@@ -1,7 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { Conversation, User } from '../../types';
 import { useChat } from '../../hooks/useChat';
-import { useAuth } from '../../hooks/useAuth';
 import { usersApi } from '../../services/api';
 
 export function ConversationList() {
@@ -13,10 +12,8 @@ export function ConversationList() {
     startConversation,
     onlineUsers,
   } = useChat();
-  const { user } = useAuth();
   const [searchQuery, setSearchQuery] = useState('');
   const [searchResults, setSearchResults] = useState<User[]>([]);
-  const [isSearching, setIsSearching] = useState(false);
 
   useEffect(() => {
     loadConversations();
@@ -29,14 +26,11 @@ export function ConversationList() {
         return;
       }
 
-      setIsSearching(true);
       try {
         const results = await usersApi.search(searchQuery);
         setSearchResults(results);
       } catch (error) {
         console.error('Search failed:', error);
-      } finally {
-        setIsSearching(false);
       }
     };
 

@@ -6,7 +6,7 @@ export function MessageInput() {
   const [message, setMessage] = useState('');
   const [isSending, setIsSending] = useState(false);
   const { sendMessage, currentConversation, error, clearError } = useChat();
-  const typingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const typingTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const isTypingRef = useRef(false);
 
   const handleTyping = () => {

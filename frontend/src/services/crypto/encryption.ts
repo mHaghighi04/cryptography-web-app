@@ -116,7 +116,7 @@ export async function decryptMessage(
   const rawKeyBuffer = await crypto.subtle.decrypt(
     { name: 'RSA-OAEP' },
     privateKey,
-    encryptedKeyBytes
+    encryptedKeyBytes.buffer as ArrayBuffer
   );
 
   // Import symmetric key
@@ -132,7 +132,7 @@ export async function decryptMessage(
   const plaintextBuffer = await crypto.subtle.decrypt(
     { name: 'AES-GCM', iv: nonce },
     symmetricKey,
-    ciphertext
+    ciphertext.buffer as ArrayBuffer
   );
 
   const decoder = new TextDecoder();
@@ -147,8 +147,8 @@ export async function decryptMessage(
   const verified = await crypto.subtle.verify(
     { name: 'RSA-PSS', saltLength: 32 },
     verificationKey,
-    signatureBytes,
-    dataToVerify
+    signatureBytes.buffer as ArrayBuffer,
+    dataToVerify.buffer as ArrayBuffer
   );
 
   return { plaintext, verified };

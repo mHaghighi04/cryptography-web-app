@@ -61,7 +61,7 @@ export async function deriveEncryptionKey(
 
   return crypto.subtle.importKey(
     'raw',
-    derivedKeyBytes,
+    derivedKeyBytes.buffer as ArrayBuffer,
     { name: 'AES-GCM' },
     false,
     ['encrypt', 'decrypt']

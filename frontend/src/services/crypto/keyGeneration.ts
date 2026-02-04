@@ -1,4 +1,4 @@
-import { deriveEncryptionKey, arrayToBase64, base64ToArray, hexToArray, arrayToHex } from './kdf';
+import { deriveEncryptionKey, arrayToBase64, base64ToArray } from './kdf';
 
 /**
  * Generate RSA-2048 key pair for encryption (OAEP) and signing (PSS)
@@ -117,7 +117,7 @@ export async function importPublicKey(pem: string): Promise<CryptoKey> {
 
   return crypto.subtle.importKey(
     'spki',
-    binaryDer,
+    binaryDer.buffer as ArrayBuffer,
     {
       name: 'RSA-OAEP',
       hash: 'SHA-256',
@@ -140,7 +140,7 @@ export async function importPrivateKey(pem: string): Promise<CryptoKey> {
 
   return crypto.subtle.importKey(
     'pkcs8',
-    binaryDer,
+    binaryDer.buffer as ArrayBuffer,
     {
       name: 'RSA-OAEP',
       hash: 'SHA-256',
@@ -163,7 +163,7 @@ export async function importPrivateKeyForSigning(pem: string): Promise<CryptoKey
 
   return crypto.subtle.importKey(
     'pkcs8',
-    binaryDer,
+    binaryDer.buffer as ArrayBuffer,
     {
       name: 'RSA-PSS',
       hash: 'SHA-256',
@@ -186,7 +186,7 @@ export async function importPublicKeyForVerification(pem: string): Promise<Crypt
 
   return crypto.subtle.importKey(
     'spki',
-    binaryDer,
+    binaryDer.buffer as ArrayBuffer,
     {
       name: 'RSA-PSS',
       hash: 'SHA-256',
