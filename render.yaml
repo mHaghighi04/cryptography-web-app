@@ -1,3 +1,9 @@
+databases:
+  - name: crypto-chat-db
+    plan: free
+    databaseName: crypto_chat
+    user: crypto_chat_user
+
 services:
   # Backend API
   - type: web
@@ -11,8 +17,12 @@ services:
         value: 3.11.0
       - key: SECRET_KEY
         generateValue: true
+      - key: ENCRYPTION_KEY
+        generateValue: true
       - key: DATABASE_URL
-        value: sqlite+aiosqlite:///./crypto_chat.db
+        fromDatabase:
+          name: crypto-chat-db
+          property: connectionString
 
   # Frontend
   - type: web
